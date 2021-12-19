@@ -1,1 +1,1 @@
-# Optimized Sobel Filter
+# SIMD Sobel Filters
