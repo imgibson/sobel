@@ -21,7 +21,7 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 	const float* pr = src;
 	const float* cr = src;
 	const float* nr = (const float*)((const uint8_t*)src + bytes_per_line_src);
-	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * bytes_per_line_src);
+	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * static_cast<uintptr_t>(bytes_per_line_src));
 
 	float* dr = dst;
 

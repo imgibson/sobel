@@ -29,7 +29,7 @@ alignas(64) static constexpr uint32_t LMerge[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 
 static const float ScaleFactor = 1.0f / sqrtf(32.0f);
 
-void math_sobel_avx512(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytes_per_line_src, uint32_t bytes_per_line_dst)
+void sobel_filter_avx512(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytes_per_line_src, uint32_t bytes_per_line_dst)
 {
 	static const __m512i RShiftVec = _mm512_load_si512((const __m512i*)&RShift[0]);
 	static const __m512i LShiftVec = _mm512_load_si512((const __m512i*)&LShift[0]);
@@ -48,7 +48,7 @@ void math_sobel_avx512(const float* __restrict src, float* __restrict dst, uint3
 	const float* pr = src;
 	const float* cr = src;
 	const float* nr = (const float*)((const uint8_t*)src + bytes_per_line_src);
-	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * bytes_per_line_src);
+	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * static_cast<uintptr_t>(bytes_per_line_src));
 
 	float* dr = dst;
 
