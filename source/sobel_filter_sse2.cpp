@@ -25,7 +25,7 @@
 static const float ScaleFactor = 1.0f / sqrtf(32.0f);
 static const __m128 ScaleVec = _mm_set1_ps(ScaleFactor);
 
-void math_sobelSSE2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytes_per_line_src, uint32_t bytes_per_line_dst)
+void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytes_per_line_src, uint32_t bytes_per_line_dst)
 {
 	// Verify 128 bit alignment
 	assert(((uintptr_t)src & 15u) == 0u);
@@ -38,7 +38,7 @@ void math_sobelSSE2(const float* __restrict src, float* __restrict dst, uint32_t
 	const float* pr = src;
 	const float* cr = src;
 	const float* nr = (const float*)((const uint8_t*)src + bytes_per_line_src);
-	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * bytes_per_line_src);
+	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * static_cast<uintptr_t>(bytes_per_line_src));
 
 	float* dr = dst;
 
