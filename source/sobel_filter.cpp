@@ -20,8 +20,8 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 {
 	const float* pr = src;
 	const float* cr = src;
-	const float* nr = (const float*)((const uint8_t*)src + bytes_per_line_src);
-	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * static_cast<uintptr_t>(bytes_per_line_src));
+	const float* nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(src)[bytes_per_line_src]);
+	const float* lr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(src)[(height - 1u) * static_cast<uintptr_t>(bytes_per_line_src)]);
 
 	float* dr = dst;
 
@@ -74,10 +74,10 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 
 		pr = cr;
 		cr = nr;
-		nr = (const float*)((const uint8_t*)nr + bytes_per_line_src);
+		nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
 		if (nr > lr)
 			nr = lr;
 
-		dr = (float*)((uint8_t*)dr + bytes_per_line_dst);
+		dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
 	}
 }
