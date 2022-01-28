@@ -28,17 +28,17 @@ static const __m128 ScaleVec = _mm_set1_ps(ScaleFactor);
 void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytes_per_line_src, uint32_t bytes_per_line_dst)
 {
 	// Verify 128 bit alignment
-	assert(((uintptr_t)src & 15u) == 0u);
-	assert(((uintptr_t)dst & 15u) == 0u);
-	assert(((uintptr_t)bytes_per_line_src & 15u) == 0u);
-	assert(((uintptr_t)bytes_per_line_dst & 15u) == 0u);
+	assert((reinterpret_cast<uintptr_t>(src) & 15u) == 0u);
+	assert((reinterpret_cast<uintptr_t>(dst) & 15u) == 0u);
+	assert((bytes_per_line_src & 15u) == 0u);
+	assert((bytes_per_line_dst & 15u) == 0u);
 	// Verify minimum SIMD width
 	assert(width >= 4u);
 
 	const float* pr = src;
 	const float* cr = src;
-	const float* nr = (const float*)((const uint8_t*)src + bytes_per_line_src);
-	const float* lr = (const float*)((const uint8_t*)src + (height - 1u) * static_cast<uintptr_t>(bytes_per_line_src));
+	const float* nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(src)[bytes_per_line_src]);
+	const float* lr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(src)[(height - 1u) * static_cast<uintptr_t>(bytes_per_line_src)]);
 
 	float* dr = dst;
 
@@ -114,11 +114,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = (const float*)((const uint8_t*)nr + bytes_per_line_src);
+				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
 				if (nr > lr)
 					nr = lr;
 
-				dr = (float*)((uint8_t*)dr + bytes_per_line_dst);
+				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
 			}
 		}
 		else
@@ -143,11 +143,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = (const float*)((const uint8_t*)nr + bytes_per_line_src);
+				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
 				if (nr > lr)
 					nr = lr;
 
-				dr = (float*)((uint8_t*)dr + bytes_per_line_dst);
+				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
 			}
 		}
 	}
@@ -243,11 +243,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = (const float*)((const uint8_t*)nr + bytes_per_line_src);
+				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
 				if (nr > lr)
 					nr = lr;
 
-				dr = (float*)((uint8_t*)dr + bytes_per_line_dst);
+				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
 			}
 		}
 		else
@@ -306,11 +306,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = (const float*)((const uint8_t*)nr + bytes_per_line_src);
+				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
 				if (nr > lr)
 					nr = lr;
 
-				dr = (float*)((uint8_t*)dr + bytes_per_line_dst);
+				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
 			}
 		}
 	}
