@@ -25,6 +25,9 @@
 static const float ScaleFactor = 1.0f / sqrtf(32.0f);
 static const __m128 ScaleVec = _mm_set1_ps(ScaleFactor);
 
+static inline const float* offset_float_ptr(const float* ptr, uintptr_t byte_offset) { return reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(ptr)[byte_offset]); }
+static inline float* offset_float_ptr(float* ptr, uintptr_t byte_offset) { return reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(ptr)[byte_offset]); }
+
 void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytes_per_line_src, uint32_t bytes_per_line_dst)
 {
 	// Verify 128 bit alignment
@@ -37,8 +40,8 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 	const float* pr = src;
 	const float* cr = src;
-	const float* nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(src)[bytes_per_line_src]);
-	const float* lr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(src)[(height - 1u) * static_cast<uintptr_t>(bytes_per_line_src)]);
+	const float* nr = offset_float_ptr(src, bytes_per_line_src);
+	const float* lr = offset_float_ptr(src, (height - 1u) * static_cast<uintptr_t>(bytes_per_line_src));
 
 	float* dr = dst;
 
@@ -114,11 +117,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
+				nr = offset_float_ptr(nr, bytes_per_line_src);
 				if (nr > lr)
 					nr = lr;
 
-				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
+				dr = offset_float_ptr(dr, bytes_per_line_dst);
 			}
 		}
 		else
@@ -143,11 +146,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
+				nr = offset_float_ptr(nr, bytes_per_line_src);
 				if (nr > lr)
 					nr = lr;
 
-				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
+				dr = offset_float_ptr(dr, bytes_per_line_dst);
 			}
 		}
 	}
@@ -243,11 +246,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
+				nr = offset_float_ptr(nr, bytes_per_line_src);
 				if (nr > lr)
 					nr = lr;
 
-				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
+				dr = offset_float_ptr(dr, bytes_per_line_dst);
 			}
 		}
 		else
@@ -306,11 +309,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = reinterpret_cast<const float*>(&reinterpret_cast<const uint8_t*>(nr)[bytes_per_line_src]);
+				nr = offset_float_ptr(nr, bytes_per_line_src);
 				if (nr > lr)
 					nr = lr;
 
-				dr = reinterpret_cast<float*>(&reinterpret_cast<uint8_t*>(dr)[bytes_per_line_dst]);
+				dr = offset_float_ptr(dr, bytes_per_line_dst);
 			}
 		}
 	}
