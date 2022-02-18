@@ -22,26 +22,43 @@
 #define RSHIFTM(shift, merge) _mm_or_ps(RSHIFT(shift), _mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(merge), 12)))
 #define LSHIFTM(shift, merge) _mm_or_ps(LSHIFT(shift), _mm_castsi128_ps(_mm_slli_si128(_mm_castps_si128(merge), 12)))
 
+static constexpr uint32_t SimdWidth = 4u;
+static constexpr uint32_t ByteAlign = SimdWidth * sizeof(float);
+static constexpr uint32_t MaskAlign = ByteAlign - 1u;
+
 static const float ScaleFactor = 1.0f / sqrtf(32.0f);
 static const __m128 ScaleVec = _mm_set1_ps(ScaleFactor);
 
-static inline const float* offset_float_ptr(const float* ptr, uintptr_t byteOffset) { return reinterpret_cast<const float*>(&(reinterpret_cast<const uint8_t*>(ptr)[byteOffset])); }
-static inline float* offset_float_ptr(float* ptr, uintptr_t byteOffset) { return reinterpret_cast<float*>(&(reinterpret_cast<uint8_t*>(ptr)[byteOffset])); }
+static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset)
+{
+	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
+	assert((byteOffset & MaskAlign) == 0u);
+	const void* offsetPtr = &static_cast<const uint8_t*>(ptr)[byteOffset];
+	return static_cast<const float*>(offsetPtr);
+}
+
+static inline float* offset_ptr(void* ptr, uintptr_t byteOffset)
+{
+	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
+	assert((byteOffset & MaskAlign) == 0u);
+	void* offsetPtr = &static_cast<uint8_t*>(ptr)[byteOffset];
+	return static_cast<float*>(offsetPtr);
+}
 
 void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst)
 {
 	// Verify 128 bit alignment
-	assert((reinterpret_cast<uintptr_t>(src) & 15u) == 0u);
-	assert((reinterpret_cast<uintptr_t>(dst) & 15u) == 0u);
-	assert((bytesPerLineSrc & 15u) == 0u);
-	assert((bytesPerLineDst & 15u) == 0u);
+	assert((reinterpret_cast<uintptr_t>(src) & MaskAlign) == 0u);
+	assert((reinterpret_cast<uintptr_t>(dst) & MaskAlign) == 0u);
+	assert((bytesPerLineSrc & MaskAlign) == 0u);
+	assert((bytesPerLineDst & MaskAlign) == 0u);
 	// Verify minimum SIMD width
-	assert(width >= 4u);
+	assert(width >= SimdWidth);
 
 	const float* pr = src;
 	const float* cr = src;
-	const float* nr = offset_float_ptr(src, bytesPerLineSrc);
-	const float* lr = offset_float_ptr(src, (height - 1u) * static_cast<uintptr_t>(bytesPerLineSrc));
+	const float* nr = offset_ptr(src, bytesPerLineSrc);
+	const float* lr = offset_ptr(src, (height - 1u) * static_cast<uintptr_t>(bytesPerLineSrc));
 
 	float* dr = dst;
 
@@ -117,11 +134,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = offset_float_ptr(nr, bytesPerLineSrc);
+				nr = offset_ptr(nr, bytesPerLineSrc);
 				if (nr > lr)
 					nr = lr;
 
-				dr = offset_float_ptr(dr, bytesPerLineDst);
+				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}
 		else
@@ -146,11 +163,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = offset_float_ptr(nr, bytesPerLineSrc);
+				nr = offset_ptr(nr, bytesPerLineSrc);
 				if (nr > lr)
 					nr = lr;
 
-				dr = offset_float_ptr(dr, bytesPerLineDst);
+				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}
 	}
@@ -246,11 +263,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = offset_float_ptr(nr, bytesPerLineSrc);
+				nr = offset_ptr(nr, bytesPerLineSrc);
 				if (nr > lr)
 					nr = lr;
 
-				dr = offset_float_ptr(dr, bytesPerLineDst);
+				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}
 		else
@@ -309,11 +326,11 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 				pr = cr;
 				cr = nr;
-				nr = offset_float_ptr(nr, bytesPerLineSrc);
+				nr = offset_ptr(nr, bytesPerLineSrc);
 				if (nr > lr)
 					nr = lr;
 
-				dr = offset_float_ptr(dr, bytesPerLineDst);
+				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}
 	}
