@@ -27,19 +27,19 @@ alignas(64) static constexpr uint32_t LShift[16] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 
 alignas(64) static constexpr uint32_t RMerge[16] = { 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
 alignas(64) static constexpr uint32_t LMerge[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+static const __m512i RShiftVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&RShift[0]));
+static const __m512i LShiftVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&LShift[0]));
+static const __m512i RMergeVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&RMerge[0]));
+static const __m512i LMergeVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&LMerge[0]));
+
 static const float ScaleFactor = 1.0f / sqrtf(32.0f);
+static const __m512 ScaleVec = _mm512_set1_ps(ScaleFactor);
 
 static inline const float* offset_float_ptr(const float* ptr, uintptr_t byteOffset) { return reinterpret_cast<const float*>(&(reinterpret_cast<const uint8_t*>(ptr)[byteOffset])); }
 static inline float* offset_float_ptr(float* ptr, uintptr_t byteOffset) { return reinterpret_cast<float*>(&(reinterpret_cast<uint8_t*>(ptr)[byteOffset])); }
 
 void sobel_filter_avx512(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst)
 {
-	static const __m512i RShiftVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&RShift[0]));
-	static const __m512i LShiftVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&LShift[0]));
-	static const __m512i RMergeVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&RMerge[0]));
-	static const __m512i LMergeVec = _mm512_load_si512(reinterpret_cast<const __m512i*>(&LMerge[0]));
-	static const __m512 ScaleVec = _mm512_set1_ps(ScaleFactor);
-
 	// Verify 512 bit alignment
 	assert((reinterpret_cast<uintptr_t>(src) & 63u) == 0u);
 	assert((reinterpret_cast<uintptr_t>(dst) & 63u) == 0u);

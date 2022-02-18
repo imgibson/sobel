@@ -22,24 +22,24 @@
 #define RSHIFTM(shift, merge) _mm256_blend_ps(RSHIFT(shift), _mm256_permutevar8x32_ps(merge, RMergeVec), 0b00000001)
 #define LSHIFTM(shift, merge) _mm256_blend_ps(LSHIFT(shift), _mm256_permutevar8x32_ps(merge, LMergeVec), 0b10000000)
 
-static const float ScaleFactor = 1.0f / sqrtf(32.0f);
-
 alignas(32) static constexpr uint32_t RShift[8] = { 0, 0, 1, 2, 3, 4, 5, 6 };
 alignas(32) static constexpr uint32_t LShift[8] = { 1, 2, 3, 4, 5, 6, 7, 7 };
 alignas(32) static constexpr uint32_t RMerge[8] = { 7, 7, 7, 7, 7, 7, 7, 7 };
 alignas(32) static constexpr uint32_t LMerge[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+static const __m256i RShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&RShift[0]));
+static const __m256i LShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&LShift[0]));
+static const __m256i RMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&RMerge[0]));
+static const __m256i LMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&LMerge[0]));
+
+static const float ScaleFactor = 1.0f / sqrtf(32.0f);
+static const __m256 ScaleVec = _mm256_set1_ps(ScaleFactor);
 
 static inline const float* offset_float_ptr(const float* ptr, uintptr_t byteOffset) { return reinterpret_cast<const float*>(&(reinterpret_cast<const uint8_t*>(ptr)[byteOffset])); }
 static inline float* offset_float_ptr(float* ptr, uintptr_t byteOffset) { return reinterpret_cast<float*>(&(reinterpret_cast<uint8_t*>(ptr)[byteOffset])); }
 
 void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst)
 {
-	const __m256 ScaleVec = _mm256_set1_ps(ScaleFactor);
-	const __m256i RShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&RShift[0]));
-	const __m256i LShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&LShift[0]));
-	const __m256i RMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&RMerge[0]));
-	const __m256i LMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&LMerge[0]));
-
 	// Verify 256 bit alignment
 	assert((reinterpret_cast<uintptr_t>(src) & 31u) == 0u);
 	assert((reinterpret_cast<uintptr_t>(dst) & 31u) == 0u);
