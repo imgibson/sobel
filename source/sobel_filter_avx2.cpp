@@ -9,61 +9,64 @@
  * - The authors reserve the rights to change the license agreements in future versions of the software
  */
 
-#include "sobel_filter.h"
-
-#include <cstdint>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 
 #include <immintrin.h> // Intel AVX
 
-#define RSHIFT(shift) _mm256_permutevar8x32_ps(shift, RShiftVec)
-#define LSHIFT(shift) _mm256_permutevar8x32_ps(shift, LShiftVec)
-#define RSHIFTM(shift, merge) _mm256_blend_ps(RSHIFT(shift), _mm256_permutevar8x32_ps(merge, RMergeVec), 0b00000001)
-#define LSHIFTM(shift, merge) _mm256_blend_ps(LSHIFT(shift), _mm256_permutevar8x32_ps(merge, LMergeVec), 0b10000000)
+#include "sobel_filter.h"
 
-static constexpr uint32_t SimdWidth = 8u;
-static constexpr uint32_t ByteAlign = SimdWidth * sizeof(float);
-static constexpr uint32_t MaskAlign = ByteAlign - 1u;
+#define RSHIFT(shift) _mm256_permutevar8x32_ps(shift, kRightShiftVec)
+#define LSHIFT(shift) _mm256_permutevar8x32_ps(shift, kLeftShiftVec)
+#define RSHIFTM(shift, merge) _mm256_blend_ps(RSHIFT(shift), _mm256_permutevar8x32_ps(merge, kRightMergeVec), 0b00000001)
+#define LSHIFTM(shift, merge) _mm256_blend_ps(LSHIFT(shift), _mm256_permutevar8x32_ps(merge, kLeftMergeVec), 0b10000000)
 
-alignas(32) static constexpr uint32_t RShift[8] = { 0, 0, 1, 2, 3, 4, 5, 6 };
-alignas(32) static constexpr uint32_t LShift[8] = { 1, 2, 3, 4, 5, 6, 7, 7 };
-alignas(32) static constexpr uint32_t RMerge[8] = { 7, 7, 7, 7, 7, 7, 7, 7 };
-alignas(32) static constexpr uint32_t LMerge[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static constexpr uint32_t kSimdWidth = 8u;
+static constexpr uint32_t kByteAlign = kSimdWidth * sizeof(float);
+static constexpr uint32_t kMaskAlign = kByteAlign - 1u;
 
-static const __m256i RShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&RShift[0]));
-static const __m256i LShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&LShift[0]));
-static const __m256i RMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&RMerge[0]));
-static const __m256i LMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&LMerge[0]));
+alignas(32) static constexpr uint32_t kRightShift[8] = { 0, 0, 1, 2, 3, 4, 5, 6 };
+alignas(32) static constexpr uint32_t kLeftShift[8] = { 1, 2, 3, 4, 5, 6, 7, 7 };
+alignas(32) static constexpr uint32_t kRightMerge[8] = { 7, 7, 7, 7, 7, 7, 7, 7 };
+alignas(32) static constexpr uint32_t kLeftMerge[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-static const float ScaleFactor = 1.0f / sqrtf(32.0f);
-static const __m256 ScaleVec = _mm256_set1_ps(ScaleFactor);
+static const __m256i kRightShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&kRightShift[0]));
+static const __m256i kLeftShiftVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&kLeftShift[0]));
+static const __m256i kRightMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&kRightMerge[0]));
+static const __m256i kLeftMergeVec = _mm256_load_si256(reinterpret_cast<const __m256i*>(&kLeftMerge[0]));
 
-static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset)
-{
-	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
-	assert((byteOffset & MaskAlign) == 0u);
+static const float kScaleFactor = 1.0f / sqrtf(32.0f);
+static const __m256 kScaleVec = _mm256_set1_ps(kScaleFactor);
+
+static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
+#ifdef _DEBUG
+	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
+	assert((byteOffset & kMaskAlign) == 0u);
+#endif
 	const void* offsetPtr = &static_cast<const uint8_t*>(ptr)[byteOffset];
 	return static_cast<const float*>(offsetPtr);
 }
 
-static inline float* offset_ptr(void* ptr, uintptr_t byteOffset)
-{
-	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
-	assert((byteOffset & MaskAlign) == 0u);
+static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
+#ifdef _DEBUG
+	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
+	assert((byteOffset & kMaskAlign) == 0u);
+#endif
 	void* offsetPtr = &static_cast<uint8_t*>(ptr)[byteOffset];
 	return static_cast<float*>(offsetPtr);
 }
 
-void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst)
-{
+void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) {
+#ifdef _DEBUG
 	// Verify 256 bit alignment
-	assert((reinterpret_cast<uintptr_t>(src) & MaskAlign) == 0u);
-	assert((reinterpret_cast<uintptr_t>(dst) & MaskAlign) == 0u);
-	assert((bytesPerLineSrc & MaskAlign) == 0u);
-	assert((bytesPerLineDst & MaskAlign) == 0u);
+	assert((reinterpret_cast<uintptr_t>(src) & kMaskAlign) == 0u);
+	assert((reinterpret_cast<uintptr_t>(dst) & kMaskAlign) == 0u);
+	assert((bytesPerLineSrc & kMaskAlign) == 0u);
+	assert((bytesPerLineDst & kMaskAlign) == 0u);
 	// Verify minimum SIMD width
-	assert(width >= SimdWidth);
+	assert(width >= kSimdWidth);
+#endif
 
 	const float* pr = src;
 	const float* cr = src;
@@ -72,12 +75,9 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 
 	float* dr = dst;
 
-	if ((width & 7u) == 0u) // Even mulitple of SIMD size
-	{
-		if (width >= 16u)
-		{
-			while (pr < lr)
-			{
+	if ((width & 7u) == 0u) {
+		if (width >= 16u) {
+			while (pr < lr) {
 				__m256 top = _mm256_load_ps(pr);
 				__m256 mid = _mm256_load_ps(cr);
 				__m256 low = _mm256_load_ps(nr);
@@ -98,14 +98,13 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 				__m256 out = _mm256_add_ps(_mm256_add_ps(curry, curry), _mm256_add_ps(RSHIFT(curry), LSHIFTM(curry, nexty)));
 				out = _mm256_fmadd_ps(out, out, xout);
 
-				out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+				out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 				_mm256_store_ps(dr, out);
 
 				uint32_t x = 16u;
 
-				for (; x < width; x += 8u)
-				{
+				for (; x < width; x += 8u) {
 					const __m256 prevx = currx;
 					const __m256 prevy = curry;
 
@@ -125,7 +124,7 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 					out = _mm256_add_ps(_mm256_add_ps(curry, curry), _mm256_add_ps(RSHIFTM(curry, prevy), LSHIFTM(curry, nexty)));
 					out = _mm256_fmadd_ps(out, out, xout);
 
-					out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+					out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 					_mm256_store_ps(&dr[x - 8u], out);
 				}
@@ -136,23 +135,20 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 				out = _mm256_add_ps(_mm256_add_ps(nexty, nexty), _mm256_add_ps(RSHIFTM(nexty, curry), LSHIFT(nexty)));
 				out = _mm256_fmadd_ps(out, out, xout);
 
-				out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+				out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 				_mm256_store_ps(&dr[x - 8u], out);
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
-		}
-		else
-		{
-			while (pr < lr)
-			{
+		} else {
+			while (pr < lr) {
 				const __m256 top = _mm256_load_ps(pr);
 				const __m256 mid = _mm256_load_ps(cr);
 				const __m256 low = _mm256_load_ps(nr);
@@ -165,29 +161,25 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 				out = _mm256_add_ps(_mm256_add_ps(out, out), _mm256_add_ps(RSHIFT(out), LSHIFT(out)));
 				out = _mm256_fmadd_ps(out, out, xout);
 
-				out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+				out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 				_mm256_store_ps(dr, out);
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}
-	}
-	else
-	{
-		if (width >= 16u)
-		{
+	} else {
+		if (width >= 16u) {
 			const uint32_t count = 8u * (width / 8u);
 			const uint32_t lx = width - 1u;
 
-			while (pr < lr)
-			{
+			while (pr < lr) {
 				__m256 top = _mm256_load_ps(pr);
 				__m256 mid = _mm256_load_ps(cr);
 				__m256 low = _mm256_load_ps(nr);
@@ -208,14 +200,13 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 				__m256 out = _mm256_add_ps(_mm256_add_ps(curry, curry), _mm256_add_ps(RSHIFT(curry), LSHIFTM(curry, nexty)));
 				out = _mm256_fmadd_ps(out, out, xout);
 
-				out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+				out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 				_mm256_store_ps(dr, out);
 
 				uint32_t x = 16u;
 
-				for (; x < count; x += 8u)
-				{
+				for (; x < count; x += 8u) {
 					const __m256 prevx = currx;
 					const __m256 prevy = curry;
 
@@ -235,13 +226,12 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 					out = _mm256_add_ps(_mm256_add_ps(curry, curry), _mm256_add_ps(RSHIFTM(curry, prevy), LSHIFTM(curry, nexty)));
 					out = _mm256_fmadd_ps(out, out, xout);
 
-					out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+					out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 					_mm256_store_ps(&dr[x - 8u], out);
 				}
 
-				for (; x < lx; ++x)
-				{
+				for (; x < lx; ++x) {
 					const float dx =
 						1.0f * (pr[x + 1u] - pr[x - 1u]) +
 						2.0f * (cr[x + 1u] - cr[x - 1u]) +
@@ -252,7 +242,7 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[x] - nr[x]) +
 						1.0f * (pr[x + 1u] - nr[x + 1u]);
 
-					dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				{
@@ -266,24 +256,21 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[lx] - nr[lx]) +
 						1.0f * (pr[lx] - nr[lx]);
 
-					dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
-		}
-		else if (width >= 8u)
-		{
+		} else if (width >= 8u) {
 			const uint32_t lx = width - 1u;
 
-			while (pr < lr)
-			{
+			while (pr < lr) {
 				{
 					const __m256 top = _mm256_load_ps(pr);
 					const __m256 mid = _mm256_load_ps(cr);
@@ -298,13 +285,12 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 					__m256 out = _mm256_add_ps(_mm256_add_ps(curry, curry), _mm256_add_ps(RSHIFT(curry), LSHIFT(curry)));
 					out = _mm256_fmadd_ps(out, out, xout);
 
-					out = _mm256_mul_ps(_mm256_sqrt_ps(out), ScaleVec);
+					out = _mm256_mul_ps(_mm256_sqrt_ps(out), kScaleVec);
 
 					_mm256_store_ps(dr, out);
 				}
 
-				for (uint32_t x = 7u; x < lx; ++x)
-				{
+				for (uint32_t x = 7u; x < lx; ++x) {
 					const float dx =
 						1.0f * (pr[x + 1u] - pr[x - 1u]) +
 						2.0f * (cr[x + 1u] - cr[x - 1u]) +
@@ -315,7 +301,7 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[x] - nr[x]) +
 						1.0f * (pr[x + 1u] - nr[x + 1u]);
 
-					dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				{
@@ -329,15 +315,15 @@ void sobel_filter_avx2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[lx] - nr[lx]) +
 						1.0f * (pr[lx] - nr[lx]);
 
-					dr[lx] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[lx] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}

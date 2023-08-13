@@ -9,51 +9,54 @@
  * - The authors reserve the rights to change the license agreements in future versions of the software
  */
 
-#include "sobel_filter.h"
-
-#include <cstdint>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 
 #include <emmintrin.h> // Intel SSE2
+
+#include "sobel_filter.h"
 
 #define RSHIFT(shift) _mm_castsi128_ps(_mm_slli_si128(_mm_castps_si128(shift), 4))
 #define LSHIFT(shift) _mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(shift), 4))
 #define RSHIFTM(shift, merge) _mm_or_ps(RSHIFT(shift), _mm_castsi128_ps(_mm_srli_si128(_mm_castps_si128(merge), 12)))
 #define LSHIFTM(shift, merge) _mm_or_ps(LSHIFT(shift), _mm_castsi128_ps(_mm_slli_si128(_mm_castps_si128(merge), 12)))
 
-static constexpr uint32_t SimdWidth = 4u;
-static constexpr uint32_t ByteAlign = SimdWidth * sizeof(float);
-static constexpr uint32_t MaskAlign = ByteAlign - 1u;
+static constexpr uint32_t kSimdWidth = 4u;
+static constexpr uint32_t kByteAlign = kSimdWidth * sizeof(float);
+static constexpr uint32_t kMaskAlign = kByteAlign - 1u;
 
-static const float ScaleFactor = 1.0f / sqrtf(32.0f);
-static const __m128 ScaleVec = _mm_set1_ps(ScaleFactor);
+static const float kScaleFactor = 1.0f / sqrtf(32.0f);
+static const __m128 kScaleVec = _mm_set1_ps(kScaleFactor);
 
-static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset)
-{
-	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
-	assert((byteOffset & MaskAlign) == 0u);
+static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
+#ifdef _DEBUG
+	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
+	assert((byteOffset & kMaskAlign) == 0u);
+#endif
 	const void* offsetPtr = &static_cast<const uint8_t*>(ptr)[byteOffset];
 	return static_cast<const float*>(offsetPtr);
 }
 
-static inline float* offset_ptr(void* ptr, uintptr_t byteOffset)
-{
-	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
-	assert((byteOffset & MaskAlign) == 0u);
+static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
+#ifdef _DEBUG
+	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
+	assert((byteOffset & kMaskAlign) == 0u);
+#endif
 	void* offsetPtr = &static_cast<uint8_t*>(ptr)[byteOffset];
 	return static_cast<float*>(offsetPtr);
 }
 
-void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst)
-{
+void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) {
+#ifdef _DEBUG
 	// Verify 128 bit alignment
-	assert((reinterpret_cast<uintptr_t>(src) & MaskAlign) == 0u);
-	assert((reinterpret_cast<uintptr_t>(dst) & MaskAlign) == 0u);
-	assert((bytesPerLineSrc & MaskAlign) == 0u);
-	assert((bytesPerLineDst & MaskAlign) == 0u);
+	assert((reinterpret_cast<uintptr_t>(src) & kMaskAlign) == 0u);
+	assert((reinterpret_cast<uintptr_t>(dst) & kMaskAlign) == 0u);
+	assert((bytesPerLineSrc & kMaskAlign) == 0u);
+	assert((bytesPerLineDst & kMaskAlign) == 0u);
 	// Verify minimum SIMD width
-	assert(width >= SimdWidth);
+	assert(width >= kSimdWidth);
+#endif
 
 	const float* pr = src;
 	const float* cr = src;
@@ -62,12 +65,9 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 
 	float* dr = dst;
 
-	if ((width & 3u) == 0u) // Even mulitple of SIMD size
-	{
-		if (width >= 8u)
-		{
-			while (pr < lr)
-			{
+	if ((width & 3u) == 0u) {
+		if (width >= 8u) {
+			while (pr < lr) {
 				__m128 top = _mm_load_ps(pr);
 				__m128 mid = _mm_load_ps(cr);
 				__m128 low = _mm_load_ps(nr);
@@ -89,14 +89,13 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 				out = _mm_mul_ps(out, out);
 				out = _mm_add_ps(out, xout);
 
-				out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+				out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 				_mm_store_ps(dr, out);
 
 				uint32_t x = 8u;
 
-				for (; x < width; x += 4u)
-				{
+				for (; x < width; x += 4u) {
 					const __m128 prevx = currx;
 					const __m128 prevy = curry;
 
@@ -117,7 +116,7 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 					out = _mm_mul_ps(out, out);
 					out = _mm_add_ps(out, xout);
 
-					out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+					out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 					_mm_store_ps(&dr[x - 4u], out);
 				}
@@ -128,23 +127,20 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 				out = _mm_add_ps(_mm_add_ps(nexty, nexty), _mm_add_ps(RSHIFTM(nexty, curry), LSHIFT(nexty)));
 				out = _mm_add_ps(_mm_mul_ps(out, out), xout);
 
-				out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+				out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 				_mm_store_ps(&dr[x - 4u], out);
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
-		}
-		else
-		{
-			while (pr < lr)
-			{
+		} else {
+			while (pr < lr) {
 				const __m128 top = _mm_load_ps(pr);
 				const __m128 mid = _mm_load_ps(cr);
 				const __m128 low = _mm_load_ps(nr);
@@ -157,29 +153,25 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 				out = _mm_add_ps(_mm_add_ps(out, out), _mm_add_ps(RSHIFT(out), LSHIFT(out)));
 				out = _mm_add_ps(_mm_mul_ps(out, out), xout);
 
-				out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+				out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 				_mm_store_ps(dr, out);
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}
-	}
-	else
-	{
-		if (width >= 8u)
-		{
+	} else {
+		if (width >= 8u) {
 			const uint32_t count = 4u * (width / 4u);
 			const uint32_t lx = width - 1u;
 
-			while (pr < lr)
-			{
+			while (pr < lr) {
 				__m128 top = _mm_load_ps(pr);
 				__m128 mid = _mm_load_ps(cr);
 				__m128 low = _mm_load_ps(nr);
@@ -200,14 +192,13 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 				__m128 out = _mm_add_ps(_mm_add_ps(curry, curry), _mm_add_ps(RSHIFT(curry), LSHIFTM(curry, nexty)));
 				out = _mm_add_ps(_mm_mul_ps(out, out), xout);
 
-				out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+				out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 				_mm_store_ps(dr, out);
 
 				uint32_t x = 8u;
 
-				for (; x < count; x += 4u)
-				{
+				for (; x < count; x += 4u) {
 					const __m128 prevx = currx;
 					const __m128 prevy = curry;
 
@@ -227,13 +218,12 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 					out = _mm_add_ps(_mm_add_ps(curry, curry), _mm_add_ps(RSHIFTM(curry, prevy), LSHIFTM(curry, nexty)));
 					out = _mm_add_ps(_mm_mul_ps(out, out), xout);
 
-					out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+					out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 					_mm_store_ps(&dr[x - 4u], out);
 				}
 
-				for (; x < lx; ++x)
-				{
+				for (; x < lx; ++x) {
 					const float dx =
 						1.0f * (pr[x + 1u] - pr[x - 1u]) +
 						2.0f * (cr[x + 1u] - cr[x - 1u]) +
@@ -244,7 +234,7 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[x] - nr[x]) +
 						1.0f * (pr[x + 1u] - nr[x + 1u]);
 
-					dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				{
@@ -258,24 +248,21 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[lx] - nr[lx]) +
 						1.0f * (pr[lx] - nr[lx]);
 
-					dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
-		}
-		else
-		{
+		} else {
 			const uint32_t lx = width - 1u;
 
-			while (pr < lr)
-			{
+			while (pr < lr) {
 				{
 					const __m128 top = _mm_load_ps(pr);
 					const __m128 mid = _mm_load_ps(cr);
@@ -290,13 +277,12 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 					__m128 out = _mm_add_ps(_mm_add_ps(curry, curry), _mm_add_ps(RSHIFT(curry), LSHIFT(curry)));
 					out = _mm_add_ps(_mm_mul_ps(out, out), xout);
 
-					out = _mm_mul_ps(_mm_sqrt_ps(out), ScaleVec);
+					out = _mm_mul_ps(_mm_sqrt_ps(out), kScaleVec);
 
 					_mm_store_ps(dr, out);
 				}
 
-				for (uint32_t x = 3u; x < lx; ++x)
-				{
+				for (uint32_t x = 3u; x < lx; ++x) {
 					const float dx =
 						1.0f * (pr[x + 1u] - pr[x - 1u]) +
 						2.0f * (cr[x + 1u] - cr[x - 1u]) +
@@ -307,7 +293,7 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[x] - nr[x]) +
 						1.0f * (pr[x + 1u] - nr[x + 1u]);
 
-					dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				{
@@ -321,15 +307,15 @@ void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint3
 						2.0f * (pr[lx] - nr[lx]) +
 						1.0f * (pr[lx] - nr[lx]);
 
-					dr[lx] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+					dr[lx] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 				}
 
 				pr = cr;
 				cr = nr;
 				nr = offset_ptr(nr, bytesPerLineSrc);
-				if (nr > lr)
+				if (nr > lr) {
 					nr = lr;
-
+				}
 				dr = offset_ptr(dr, bytesPerLineDst);
 			}
 		}

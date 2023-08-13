@@ -9,41 +9,42 @@
  * - The authors reserve the rights to change the license agreements in future versions of the software
  */
 
-#include "sobel_filter.h"
-
-#include <cstdint>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 
-static constexpr uint32_t ByteAlign = sizeof(float);
-static constexpr uint32_t MaskAlign = ByteAlign - 1u;
+#include "sobel_filter.h"
 
-static const float ScaleFactor = 1.0f / sqrtf(32.0f);
+static constexpr uint32_t kByteAlign = sizeof(float);
+static constexpr uint32_t kMaskAlign = kByteAlign - 1u;
+static const float kScaleFactor = 1.0f / sqrtf(32.0f);
 
-static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset)
-{
-	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
-	assert((byteOffset & MaskAlign) == 0u);
-	const void* offsetPtr = &static_cast<const uint8_t*>(ptr)[byteOffset];
+static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
+#ifdef _DEBUG
+	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
+	assert((byteOffset & kMaskAlign) == 0u);
+#endif
+	const void* offsetPtr = &(static_cast<const uint8_t*>(ptr)[byteOffset]);
 	return static_cast<const float*>(offsetPtr);
 }
 
-static inline float* offset_ptr(void* ptr, uintptr_t byteOffset)
-{
-	assert((reinterpret_cast<uintptr_t>(ptr) & MaskAlign) == 0u);
-	assert((byteOffset & MaskAlign) == 0u);
-	void* offsetPtr = &static_cast<uint8_t*>(ptr)[byteOffset];
+static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
+#ifdef _DEBUG
+	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
+	assert((byteOffset & kMaskAlign) == 0u);
+#endif
+	void* offsetPtr = &(static_cast<uint8_t*>(ptr)[byteOffset]);
 	return static_cast<float*>(offsetPtr);
 }
 
-void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst)
-{
+void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) {
+#ifdef _DEBUG
 	// Verify 32 bit alignment
-	assert((reinterpret_cast<uintptr_t>(src) & MaskAlign) == 0u);
-	assert((reinterpret_cast<uintptr_t>(dst) & MaskAlign) == 0u);
-	assert((bytesPerLineSrc & MaskAlign) == 0u);
-	assert((bytesPerLineDst & MaskAlign) == 0u);
-
+	assert((reinterpret_cast<uintptr_t>(src) & kMaskAlign) == 0u);
+	assert((reinterpret_cast<uintptr_t>(dst) & kMaskAlign) == 0u);
+	assert((bytesPerLineSrc & kMaskAlign) == 0u);
+	assert((bytesPerLineDst & kMaskAlign) == 0u);
+#endif
 	const float* pr = src;
 	const float* cr = src;
 	const float* nr = offset_ptr(src, bytesPerLineSrc);
@@ -53,8 +54,7 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 
 	const uint32_t lx = width - 1u;
 
-	while (pr < lr)
-	{
+	while (pr < lr) {
 		{
 			const float dx =
 				1.0f * (pr[1u] - pr[0u]) +
@@ -66,11 +66,10 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 				2.0f * (pr[0u] - nr[0u]) +
 				1.0f * (pr[1u] - nr[1u]);
 
-			dr[0u] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+			dr[0u] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 		}
 
-		for (uint32_t x = 1u; x < lx; ++x)
-		{
+		for (uint32_t x = 1u; x < lx; ++x) {
 			const float dx =
 				1.0f * (pr[x + 1u] - pr[x - 1u]) +
 				2.0f * (cr[x + 1u] - cr[x - 1u]) +
@@ -81,7 +80,7 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 				2.0f * (pr[x] - nr[x]) +
 				1.0f * (pr[x + 1u] - nr[x + 1u]);
 
-			dr[x] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+			dr[x] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 		}
 
 		{
@@ -95,14 +94,15 @@ void sobel_filter(const float* __restrict src, float* __restrict dst, uint32_t w
 				2.0f * (pr[lx] - nr[lx]) +
 				1.0f * (pr[lx] - nr[lx]);
 
-			dr[lx] = sqrtf(dx * dx + dy * dy) * ScaleFactor;
+			dr[lx] = sqrtf(dx * dx + dy * dy) * kScaleFactor;
 		}
 
 		pr = cr;
 		cr = nr;
 		nr = offset_ptr(nr, bytesPerLineSrc);
-		if (nr > lr)
+		if (nr > lr) {
 			nr = lr;
+		}
 
 		dr = offset_ptr(dr, bytesPerLineDst);
 	}
