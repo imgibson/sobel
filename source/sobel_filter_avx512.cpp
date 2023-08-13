@@ -39,7 +39,7 @@ static const __m512i kLeftMergeVec = _mm512_load_si512(reinterpret_cast<const __
 static const float kScaleFactor = 1.0f / sqrtf(32.0f);
 static const __m512 kScaleVec = _mm512_set1_ps(kScaleFactor);
 
-static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
+static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) noexcept {
 #ifdef _DEBUG
 	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
 	assert((byteOffset & kMaskAlign) == 0u);
@@ -48,7 +48,7 @@ static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
 	return static_cast<const float*>(offsetPtr);
 }
 
-static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
+static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) noexcept {
 #ifdef _DEBUG
 	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
 	assert((byteOffset & kMaskAlign) == 0u);
@@ -57,7 +57,7 @@ static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
 	return static_cast<float*>(offsetPtr);
 }
 
-void sobel_filter_avx512(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) {
+void sobel_filter_avx512(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) noexcept {
 #ifdef _DEBUG
 	// Verify 512 bit alignment
 	assert((reinterpret_cast<uintptr_t>(src) & kMaskAlign) == 0u);

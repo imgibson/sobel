@@ -29,7 +29,7 @@ static constexpr uint32_t kMaskAlign = kByteAlign - 1u;
 static const float kScaleFactor = 1.0f / sqrtf(32.0f);
 static const __m128 kScaleVec = _mm_set1_ps(kScaleFactor);
 
-static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
+static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) noexcept {
 #ifdef _DEBUG
 	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
 	assert((byteOffset & kMaskAlign) == 0u);
@@ -38,7 +38,7 @@ static inline const float* offset_ptr(const void* ptr, uintptr_t byteOffset) {
 	return static_cast<const float*>(offsetPtr);
 }
 
-static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
+static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) noexcept {
 #ifdef _DEBUG
 	assert((reinterpret_cast<uintptr_t>(ptr) & kMaskAlign) == 0u);
 	assert((byteOffset & kMaskAlign) == 0u);
@@ -47,7 +47,7 @@ static inline float* offset_ptr(void* ptr, uintptr_t byteOffset) {
 	return static_cast<float*>(offsetPtr);
 }
 
-void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) {
+void sobel_filter_sse2(const float* __restrict src, float* __restrict dst, uint32_t width, uint32_t height, uint32_t bytesPerLineSrc, uint32_t bytesPerLineDst) noexcept {
 #ifdef _DEBUG
 	// Verify 128 bit alignment
 	assert((reinterpret_cast<uintptr_t>(src) & kMaskAlign) == 0u);
